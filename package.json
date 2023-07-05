@@ -1,0 +1,12 @@
+{
+    "name": "com.mjtstudio.toolkit.templatecreator",
+    "displayName": "TemplateCreator",
+    "version": "0.1.0",
+    "unity": "2021.3",
+    "description": "Editor extension to create project template packages (.tgz) for Unity Software.",
+    "author": {
+        "name": "MojattoStudio",
+        "url": "https://mjtstudio.net"
+    },
+    "license": "Apache"
+}

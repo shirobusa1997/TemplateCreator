@@ -1,9 +1,7 @@
 {
-    "name": "MJTStudio.TemplateCreator.Editor",
+    "name": "ICSC.SZL",
     "rootNamespace": "",
-    "references": [
-        "GUID:3bf8a35c8df8c1547a112e05b3ad75da"
-    ],
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
@@ -12,7 +10,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "!UDON"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

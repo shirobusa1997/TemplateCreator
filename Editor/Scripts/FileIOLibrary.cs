@@ -26,32 +26,35 @@ using UnityEditor;
 namespace MJTStudio.TemplateCreator.Editor
 {
     /// <summary>
-    /// 
+    /// ファイル処理に関わる処理を提供するライブラリクラスです。
     /// </summary>
     public static class FileIOLibrary
     {
         /// <summary>
-        /// 
+        /// 指定されたパスにアクセス権限があるかをチェックする際に使用するダミーのフォルダ名
         /// </summary>
         private const string FOLDER_NAME_FOR_WRITE_PERMISSION_CHECK = "_DUMMY";
 
         /// <summary>
-        /// 
+        /// 指定されたパスに書き込み権限があるかをチェックします。
         /// </summary>
         /// <param name="targetPath"></param>
         /// <returns></returns>
         public static bool CheckFileWritePermission(string targetPath)
         {
-            //
+            // ダミーのフォルダを作成して削除することで、指定されたパスに書き込み権限があるかをチェックする
+            // ダミーのフォルダ名を加えた権限チェック先へのパスを生成する
             string tempPath = Path.Combine(targetPath, FOLDER_NAME_FOR_WRITE_PERMISSION_CHECK);
 
+            // ディレクトリ作成を試みる
             try
             {
                 //
                 Directory.CreateDirectory(tempPath);
                 Directory.Delete(tempPath);
             }
-            //
+            // 例外処理
+            // 例外内容に関わらず、権限なしとみなしfalseを返す
             catch (Exception e)
             {
                 Debug.LogError(
@@ -63,23 +66,23 @@ namespace MJTStudio.TemplateCreator.Editor
                 return false;
             }
 
+            // ここまで到達した場合は、指定されたパスに書き込み権限があるとみなしtrueを返す
             Debug.Log(
                 typeof(FileIOLibrary).Name
                 + ": 書き込みチェック OK\n"
                 + "-> "
                 + tempPath
             );
-
             return true;
         }
 
         /// <summary>
-        /// 
+        /// 指定されたパスのディレクトリを、目的のパスに非同期にコピーする
         /// </summary>
-        /// <param name="targetDirPath"></param>
-        /// <param name="destDirPath"></param>
-        /// <param name="isRecursive"></param>
-        /// <returns></returns>
+        /// <param name="targetDirPath">コピーするディレクトリのパス</param>
+        /// <param name="destDirPath">コピー先のディレクトリのパス</param>
+        /// <param name="isRecursive">サブディレクトリも再帰的にコピーするか</param>
+        /// <returns>タスクインスタンス</returns>
         public static async Task CopyDirectoryAsync(
             string targetDirPath, 
             string destDirPath, 
@@ -132,7 +135,7 @@ namespace MJTStudio.TemplateCreator.Editor
                     + targetDirInfo.FullName
                 ;
 
-                // throw new exception
+                // コール元に例外をスロー
                 throw new InvalidOperationException(
                     typeof(FileIOLibrary).Name
                     + message
@@ -140,7 +143,6 @@ namespace MJTStudio.TemplateCreator.Editor
             }
 
             // ディレクトリ内のファイル情報を取得
-            // DirectoryInfo[] targetDirs = targetDirInfo.GetDirectories();
             string[] filesPaths       = Directory.GetFiles(targetDirPath, "*", SearchOption.AllDirectories);
             int      currentFileCount = 0;
             int      totalFileCount   = filesPaths.Length;
@@ -149,26 +151,24 @@ namespace MJTStudio.TemplateCreator.Editor
             // コピー先にディレクトリが存在しない場合は新たに作成する
             Directory.CreateDirectory(destDirPath);
 
-            //
-            // foreach(FileInfo fileInfo in targetDirInfo.GetFiles())
+            // 指定されたパスの数分繰り返す
             foreach(string filePath in filesPaths)
             {
-                //
+                // 指定ディレクトリの複製を試みる
                 try
                 {
-                    //
+                    // 個々のファイルのコピー先のパスを生成する
                     string relativeTargetPath = GetRelativePath(targetDirPath, filePath);
                     string destPath           = Path.Combine(destDirPath, relativeTargetPath);
 
+                    // コピー先のディレクトリが存在しない場合は新たに作成する
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath));
 
-                    //
+                    // ファイルをコピーする
                     using (FileStream targetStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     {
-                        //
                         using (FileStream destStream = File.Create(destPath))
                         {
-                            //
                             await targetStream.CopyToAsync(destStream);
                         }
                     }
@@ -234,20 +234,6 @@ namespace MJTStudio.TemplateCreator.Editor
             //
             EditorUtility.ClearProgressBar();
 #       endif
-
-            //
-            // if (isRecursive)
-            // {
-            //     //
-            //     foreach (DirectoryInfo subDir in targetDirs)
-            //     {
-            //         //
-            //         string subDestDir = Path.Combine(destDirPath, subDir.Name);
-
-            //         //
-            //         await CopyDirectoryAsync(subDir.FullName, subDestDir, true);
-            //     }
-            // }
         }
 
         /// <summary>
@@ -258,12 +244,12 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <returns></returns>
         public static string GetRelativePath(string basePath, string targetPath)
         {
-            //
+            // 基準パス、到達先パス、相対パスのUriを生成する
             Uri baseUri     = new Uri(basePath + Path.DirectorySeparatorChar);
             Uri targetUri   = new Uri(targetPath);
             Uri relativeUri = baseUri.MakeRelativeUri(targetUri);
 
-            //
+            // 相対パスをディレクトリ区切り文字に置換して返す
             return Uri.UnescapeDataString(relativeUri.ToString()).Replace('/', Path.DirectorySeparatorChar);
         }
     }    

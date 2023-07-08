@@ -139,7 +139,7 @@ namespace MJTStudio.TemplateCreator.Editor
         /// </summary>
         public void Reset()
         {
-            //
+            // コンポーネントを初期化
             Initialize();
         }
 
@@ -386,7 +386,7 @@ namespace MJTStudio.TemplateCreator.Editor
                 return;
             }
 
-            //
+            // C#コンソールのカレントディレクトリをプロジェクトのルートディレクトリに戻す
             Directory.SetCurrentDirectory(projectDir);
 
             // 処理成功とみなしtrueを返す
@@ -446,9 +446,11 @@ namespace MJTStudio.TemplateCreator.Editor
         /// </summary>
         private void Initialize()
         {
+            // プロジェクトディレクトリのパスを取得
             packageInfo = new PackageInfo();
             packageDestinationPath = "";
 
+            // 起動中のエディタバージョンに対応したプロジェクトテンプレートの格納先パスを取得し保持する
             editorProjectTemplateDirectoryPath = 
                 Path.Combine(
                     Path.GetDirectoryName(EditorApplication.applicationPath),
@@ -456,9 +458,11 @@ namespace MJTStudio.TemplateCreator.Editor
                 ).Replace("\\", "/");
             Debug.Log("EditorProjectTemplateDirectoryPath: \n" + editorProjectTemplateDirectoryPath);
 
+            // エディタ拡張ウィンドウの最大・最小サイズを固定
             minSize = new Vector2(320f, 800f);
             maxSize = new Vector2(320f, 800f);
             
+            // エディタ拡張ウィンドウの初期サイズを設定し固定
             var windowPosition = position;
             windowPosition.size = new Vector2(320f, 800f);
             position = windowPosition;

@@ -151,17 +151,4 @@ namespace MJTStudio.TemplateCreator.Editor
         //     }
         // }
     }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="args"></param>
-    /// <returns></returns>
-    // public static async Task Main(string[] args)
-    // {
-    //     string sourceFolderPath = @"C:\path\to\folder";
-    //     string tgzFilePath = @"C:\path\to\output.tgz";
-
-    //     await ArchiveAndCompressFolderAsync(sourceFolderPath, tgzFilePath);
-    // }
 }

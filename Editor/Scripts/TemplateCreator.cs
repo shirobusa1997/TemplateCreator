@@ -36,7 +36,7 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <summary>
         /// 本エディタ拡張モジュールのバージョン番号です。
         /// </summary>
-        private const string APPLICATION_VERSION = "v0.1.1";
+        private const string APPLICATION_VERSION = "v0.1.2";
 
         /// <summary>
         /// 

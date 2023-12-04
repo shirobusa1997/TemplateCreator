@@ -36,7 +36,7 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <summary>
         /// 本エディタ拡張モジュールのバージョン番号です。
         /// </summary>
-        private const string APPLICATION_VERSION = "v0.1.2";
+        private const string APPLICATION_VERSION = "v0.2.0";
 
         /// <summary>
         /// 
@@ -83,6 +83,11 @@ namespace MJTStudio.TemplateCreator.Editor
         /// テンプレート化するプロジェクトのProjectSettingsフォルダの名前です。
         /// </summary>
         private const string TARGET_DIRECTORY_PROJECTSETTINGS_FOLDER_NAME = "ProjectSettings";
+
+        /// <summary>
+        /// 前回設定されたパッケージ情報を保持しておくためのEditorUserSettingsのキーです。
+        /// </summary>
+        private const string EDITOR_PREVIOUS_PACKAGE_INFO_USERSETTINGS_KEY = "PreviousPackageInfo";
 
         /// <summary>
         /// 本クラス内で、毎ループ処理を非同期に待機させる際の待機時間[ms]です。
@@ -467,6 +472,14 @@ namespace MJTStudio.TemplateCreator.Editor
             windowPosition.size = new Vector2(320f, 800f);
             position = windowPosition;
 
+            // 指定キーに前回値が保持されていれば、内容をパースしてクラスインスタンスとして保持する
+            var previousPackageInfoJSON = EditorUserSettings.GetConfigValue(EDITOR_PREVIOUS_PACKAGE_INFO_USERSETTINGS_KEY);
+            if (previousPackageInfoJSON != null)
+            {
+                var previousPackageInfo = JsonUtility.FromJson<PackageInfo>(previousPackageInfoJSON);
+                packageInfo = previousPackageInfo;
+            }
+
             workState = WorkState.Ready;
         }
         
@@ -796,6 +809,10 @@ namespace MJTStudio.TemplateCreator.Editor
                         // 処理状態を「処理中」に設定
                         workState = WorkState.InProgress;
 
+                        // パッケージ情報を前回設定値として保存
+                        SavePackageInfo();
+
+
                         // パッケージ生成処理を開始
 #                       pragma warning disable 
                         GenerateTemplatePackage();
@@ -804,6 +821,41 @@ namespace MJTStudio.TemplateCreator.Editor
                 }
                 EditorGUI.EndDisabledGroup();
             }
+        }
+
+        /// <summary>
+        /// 現在設定されているパッケージ情報を、前回設定値としてEditorUserSettingsに保存します。
+        /// </summary>
+        private void SavePackageInfo()
+        {
+            // パッケージ情報の保存を試行
+            try
+            {
+                // パッケージ情報をJSON形式にシリアライズ
+                var previousPackageInfoJSON = JsonUtility.ToJson(packageInfo);
+
+                // EditorUserSettingsにパッケージ情報を書き込み
+                EditorUserSettings.SetConfigValue(
+                    EDITOR_PREVIOUS_PACKAGE_INFO_USERSETTINGS_KEY,
+                    previousPackageInfoJSON
+                );
+            }
+            catch(Exception e)
+            {
+                Debug.LogError(
+                    nameof(TemplateCreator)
+                    + ": パッケージ情報の前回値保存に失敗しました。¥n"
+                    + "RawMessage: "
+                    + e
+                );
+
+                return;
+            }
+
+            Debug.Log(
+                nameof(TemplateCreator)
+                + ": パッケージ情報の前回値保存に成功しました。"
+            );
         }
 
         /// <summary>

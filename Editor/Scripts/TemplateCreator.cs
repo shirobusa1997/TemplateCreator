@@ -323,7 +323,11 @@ namespace MJTStudio.TemplateCreator.Editor
                 Directory.SetCurrentDirectory(Path.GetDirectoryName(workDirectoryPath));
 
                 // プロジェクトデータをアーカイブ化・圧縮
-                GeneratePackage();
+                bool packageResult = await GeneratePackageAsync();
+                if (!packageResult)
+                {
+                    throw new InvalidOperationException("パッケージの生成に失敗しました。ArchiverLibrary.CompressDirectoriesToTgzAsync が false を返しました。");
+                }
             }
             // 例外ハンドリング
             catch(Exception e)
@@ -549,7 +553,9 @@ namespace MJTStudio.TemplateCreator.Editor
                     Path.Combine(duplicateDestPath, TARGET_DIRECTORY_PACKAGES_FOLDER_NAME),
                     true,
                     parentTaskID,
-                    "Packagesフォルダを複製中..."
+                    "Packagesフォルダを複製中...",
+                    cts: default, // Assuming CancellationToken is default or handled by parent
+                    relativeExclusionPaths: new string[] { "com.mjtstudio.toolkit.templatecreator" }
                 ),
                     FileIOLibrary.CopyDirectoryAsync(
                     Path.Combine(targetDirectoryPath, TARGET_DIRECTORY_PROJECTSETTINGS_FOLDER_NAME),
@@ -608,8 +614,8 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <summary>
         /// プロジェクトデータをアーカイブ化・圧縮しテンプレートパッケージ(.tgz)を生成します。
         /// </summary>
-        /// <returns></returns>
-        private void GeneratePackage()
+        /// <returns>成功した場合はtrue、それ以外はfalse</returns>
+        private async Task<bool> GeneratePackageAsync()
         {
             // アーカイブ化するフォルダを指定
             string[] targetPaths = new []{PACKAGE_DIRECTORY_ROOT_FOLDER_NAME};
@@ -626,20 +632,22 @@ namespace MJTStudio.TemplateCreator.Editor
             );
 
             // アーカイブ化・圧縮を実行
-            bool result = ArchiverLibrary.CompressDirectoriesToTgz(
+            bool result = await ArchiverLibrary.CompressDirectoriesToTgzAsync(
                 destinationPackagePath,
                 targetPaths,
                 true
             );
 
-            // 何らかの要因で処理に失敗した場合、例外をスローする
+            // 何らかの要因で処理に失敗した場合、falseを返す
             if (!result)
             {
-                throw new InvalidOperationException(
+                Debug.LogError(
                     name
                     + ": テンプレートパッケージの生成に失敗しました。"
                 );
+                return false;
             }
+            return true;
         }
 
         /// <summary>

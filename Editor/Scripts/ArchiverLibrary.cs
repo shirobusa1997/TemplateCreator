@@ -39,58 +39,56 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <param name="isRecursive">配下ディレクトリのファイルも再帰的にTarアーカイブ化するかどうか</param>
         /// <param name="compressionLevel">圧縮レベル (初期値:1)</param>
         /// <returns></returns>
-        public static bool CompressDirectoriesToTgz(string destPath, string[] targetPaths, bool isRecursive, int compressionLevel = 1)
+        public static Task<bool> CompressDirectoriesToTgzAsync(string destPath, string[] targetPaths, bool isRecursive, int compressionLevel = 1)
         {
-            // 圧縮ファイル生成のためのストリームを作成する
-            using (FileStream fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
-            // GZip圧縮のためのストリームを作成する
-            using (GZipOutputStream gZipOutputStream = new GZipOutputStream(fs))
+            return Task.Run(() =>
             {
-                // 圧縮レベルを設定する
-                gZipOutputStream.SetLevel(compressionLevel);
-
-                // Tarアーカイブを作成する
-                using (TarArchive tarArchive = TarArchive.CreateOutputTarArchive(gZipOutputStream, TarBuffer.DefaultBlockFactor))
+                try
                 {
-                    // ファイルのTarアーカイブ化・圧縮を試行する
-                    try
+                    // 圧縮ファイル生成のためのストリームを作成する
+                    using (FileStream fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    // GZip圧縮のためのストリームを作成する
+                    using (GZipOutputStream gZipOutputStream = new GZipOutputStream(fs))
                     {
-                        // アーカイブ元のファイルを維持するように設定する
-                        tarArchive.SetKeepOldFiles(true);
+                        // 圧縮レベルを設定する
+                        gZipOutputStream.SetLevel(compressionLevel);
 
-                        // アーカイブ対象ファイル文字コード変換を行わないように設定する
-                        tarArchive.AsciiTranslate = false;
-
-                        // 指定されたパスの数繰り返す
-                        foreach (string targetPath in targetPaths)
+                        // Tarアーカイブを作成する
+                        using (TarArchive tarArchive = TarArchive.CreateOutputTarArchive(gZipOutputStream, TarBuffer.DefaultBlockFactor))
                         {
-                            // 指定されたパスのファイルをTarアーカイブのエントリとして生成する
-                            var tarEntry = TarEntry.CreateEntryFromFile(targetPath);
+                            // アーカイブ元のファイルを維持するように設定する
+                            tarArchive.SetKeepOldFiles(true);
 
-                            // Tarアーカイブにエントリを追加する
-                            tarArchive.WriteEntry(tarEntry, isRecursive);
+                            // アーカイブ対象ファイル文字コード変換を行わないように設定する
+                            tarArchive.AsciiTranslate = false;
+
+                            // 指定されたパスの数繰り返す
+                            foreach (string targetPath in targetPaths)
+                            {
+                                // 指定されたパスのファイルをTarアーカイブのエントリとして生成する
+                                var tarEntry = TarEntry.CreateEntryFromFile(targetPath);
+
+                                // Tarアーカイブにエントリを追加する
+                                tarArchive.WriteEntry(tarEntry, isRecursive);
+                            }
+                            // Tarアーカイブのストリームを閉じる
+                            tarArchive.Close();
                         }
                     }
-                    // ファイルのアーカイブ中に何らかの例外がスローされた場合の処理
-                    catch (Exception e)
-                    {
-                        Debug.LogError(
-                            typeof(ArchiverLibrary).Name
-                            + ": ファイルのアーカイブ中に例外がスローされました。\n"
-                            + "RawMessage: "
-                            + e
-                        );
-
-                        return false;
-                    }
-
-                    // Tarアーカイブのストリームを閉じる
-                    tarArchive.Close();
+                    return true;
                 }
-            }
-
-            //
-            return true;
+                // ファイルのアーカイブ中に何らかの例外がスローされた場合の処理
+                catch (Exception e)
+                {
+                    Debug.LogError(
+                        typeof(ArchiverLibrary).Name
+                        + ": ファイルのアーカイブ中に例外がスローされました。\n"
+                        + "RawMessage: "
+                        + e
+                    );
+                    return false;
+                }
+            });
         }
 
         /// <summary>

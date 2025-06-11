@@ -84,12 +84,13 @@ namespace MJTStudio.TemplateCreator.Editor
         /// <param name="isRecursive">サブディレクトリも再帰的にコピーするか</param>
         /// <returns>タスクインスタンス</returns>
         public static async Task CopyDirectoryAsync(
-            string targetDirPath, 
-            string destDirPath, 
-            bool   isRecursive, 
-            int    parentTaskID = -1, 
-            string taskName = "None", 
-            CancellationToken cts = default
+            string targetDirPath,
+            string destDirPath,
+            bool isRecursive,
+            int parentTaskID = -1,
+            string taskName = "None",
+            CancellationToken cts = default,
+            System.Collections.Generic.IEnumerable<string> relativeExclusionPaths = null
         )
         {
             // キャンセルされた場合は例外をスローする
@@ -151,88 +152,165 @@ namespace MJTStudio.TemplateCreator.Editor
             // コピー先にディレクトリが存在しない場合は新たに作成する
             Directory.CreateDirectory(destDirPath);
 
-            // 指定されたパスの数分繰り返す
-            foreach(string filePath in filesPaths)
+            // Create a list of tasks to copy files in parallel
+            System.Collections.Generic.List<Task> copyTasks = new System.Collections.Generic.List<Task>();
+
+            foreach (string filePath in filesPaths)
             {
-                // 指定ディレクトリの複製を試みる
-                try
+                copyTasks.Add(Task.Run(async () =>
                 {
-                    // 個々のファイルのコピー先のパスを生成する
-                    string relativeTargetPath = GetRelativePath(targetDirPath, filePath);
-                    string destPath           = Path.Combine(destDirPath, relativeTargetPath);
-
-                    // コピー先のディレクトリが存在しない場合は新たに作成する
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
-
-                    // ファイルをコピーする
-                    using (FileStream targetStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    // 指定ディレクトリの複製を試みる
+                    try
                     {
-                        using (FileStream destStream = File.Create(destPath))
+                        // 個々のファイルのコピー先のパスを生成する
+                        string relativeTargetPath = GetRelativePath(targetDirPath, filePath);
+
+                        // Check if the file should be excluded
+                        if (relativeExclusionPaths != null)
                         {
-                            await targetStream.CopyToAsync(destStream);
+                            bool excluded = false;
+                            foreach (string exclusion in relativeExclusionPaths)
+                            {
+                                if (relativeTargetPath.StartsWith(exclusion + Path.DirectorySeparatorChar) || relativeTargetPath == exclusion)
+                                {
+                                    excluded = true;
+                                    break;
+                                }
+                            }
+                            if (excluded)
+                            {
+                                // Decrement total file count as this file will be skipped
+                                Interlocked.Decrement(ref totalFileCount);
+                                // Update progress immediately for skipped files to maintain accuracy if possible, or just skip.
+                                // For simplicity, we just skip here. The progress might be slightly off if many files are excluded.
+                                // A more accurate way would be to pre-filter filesPaths or adjust totalFileCount more dynamically.
+                                return;
+                            }
                         }
+
+                        string destPath = Path.Combine(destDirPath, relativeTargetPath);
+
+                        // コピー先のディレクトリが存在しない場合は新たに作成する
+                        Directory.CreateDirectory(Path.GetDirectoryName(destPath));
+
+                        // ファイルをコピーする
+                        using (FileStream targetStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            using (FileStream destStream = File.Create(destPath))
+                            {
+                                await targetStream.CopyToAsync(destStream, cts);
+                            }
+                        }
+
+                        // Increment currentFileCount atomically and update progress
+                        int currentCount = Interlocked.Increment(ref currentFileCount);
+                        int currentTotalFiles = Volatile.Read(ref totalFileCount); // Read the potentially modified totalFileCount
+
+#                   if UNITY_2020_1_OR_NEWER
+                        //
+                        if (id != -1) // Only report progress if a valid progress ID exists
+                        {
+                            Progress.Report(
+                                id,
+                                (currentTotalFiles > 0) ? (float)currentCount / (float)currentTotalFiles : 0.0f,
+                                currentCount.ToString($"D{fileCountDigits}") + "/" + currentTotalFiles.ToString($"D{fileCountDigits}") + " files copied."
+                            );
+                        }
+#                   else
+                        //
+                        EditorUtility.DisplayProgressBar(
+                            "Copy Directory: " + targetDirInfo.Name,
+                            currentCount.ToString($"D{fileCountDigits}") + "/" + currentTotalFiles.ToString($"D{fileCountDigits}") + " files copied.",
+                            (currentTotalFiles > 0) ? (float)currentCount / (float)currentTotalFiles : 0.0f
+                        );
+#                   endif
                     }
-
-                    //
-                    currentFileCount++;
-
-#               if UNITY_2020_1_OR_NEWER
-                    //
-                    Progress.Report(
-                        id,
-                        (float)currentFileCount / (float)totalFileCount,
-                        currentFileCount.ToString($"D{fileCountDigits}") + "/" + totalFileCount.ToString($"D{fileCountDigits}") + " files copied."
-                    );
-#               else
-                    //
-                    EditorUtility.DisplayProgressBar(
-                        "Copy Directory: " + targetDirInfo.Name,
-                        currentFileCount.ToString($"D{fileCountDigits}") + "/" + totalFileCount.ToString($"D{fileCountDigits}") + " files copied.",
-                        (float)currentFileCount / (float)totalFileCount
-                    );
-#               endif
-                }
-                //
-                catch (IOException e)
-                {
-                    Debug.LogWarning(
-                        typeof(FileIOLibrary).Name
-                        + ": このファイルはアクセスが拒否されたため、コピーされませんでした。\n"
-                        + "-> "
-                        + filePath
-                        + "\nRawMessage: "
-                        + e
-                    );
-                    continue;
-                }
-                //
-                catch (Exception e)
-                {
-                    Debug.LogError(
-                        typeof(FileIOLibrary).Name
-                        + ": ハンドリングされていない例外がスローされました。処理を中断します。\n"
-                        + "RawMessage: "
-                        + e
-                    );
-
-#               if UNITY_2020_1_OR_NEWER
-                    //
-                    Progress.Cancel(id);
-#               else
-                    //
-                    EditorUtility.ClearProgressBar();
-#               endif
-
-                    return;
-                }
+                    // Handle IOException specifically for a file, allowing other files to continue copying
+                    catch (IOException e)
+                    {
+                        Debug.LogWarning(
+                            typeof(FileIOLibrary).Name
+                            + ": このファイルはアクセスが拒否されたため、コピーされませんでした。\n"
+                            + "-> "
+                            + filePath
+                            + "\nRawMessage: "
+                            + e
+                        );
+                        // If a file is skipped due to IOException, decrement totalFileCount.
+                        Interlocked.Decrement(ref totalFileCount);
+                    }
+                    // Catch other exceptions that might occur during a single file copy
+                    catch (Exception e)
+                    {
+                        Debug.LogError(
+                            typeof(FileIOLibrary).Name
+                            + ": ファイルコピー中にエラーが発生しました: " + filePath + "\n"
+                            + "RawMessage: "
+                            + e
+                        );
+                        // If a file is skipped due to other exceptions, decrement totalFileCount.
+                        Interlocked.Decrement(ref totalFileCount);
+                        // Optionally, rethrow if you want Task.WhenAll to catch it, or handle specific cleanup
+                    }
+                }, cts));
             }
 
+            try
+            {
+                await Task.WhenAll(copyTasks);
+            }
+            catch (Exception e) // Catch exceptions from Task.WhenAll (e.g., if a task was faulted)
+            {
+                Debug.LogError(
+                    typeof(FileIOLibrary).Name
+                    + ": ファイルの並列コピー中にエラーが発生しました。\n"
+                    + "RawMessage: "
+                    + e
+                );
+#               if UNITY_2020_1_OR_NEWER
+                //
+                if (id != -1) Progress.Cancel(id);
+#               else
+                //
+                EditorUtility.ClearProgressBar();
+#               endif
+                // Depending on the desired behavior, you might want to rethrow or handle more gracefully
+                throw; // Rethrowing the exception to indicate failure of the copy operation
+            }
+
+            // Final progress update to ensure it reaches 100% if all files were processed or skipped.
+            // This is important if totalFileCount was decremented.
+            int finalCurrentCount = Volatile.Read(ref currentFileCount);
+            int finalTotalCount = Volatile.Read(ref totalFileCount);
+
 #       if UNITY_2020_1_OR_NEWER
-            //
-            Progress.Finish(id);
+            if (id != -1)
+            {
+                Progress.Report(
+                    id,
+                    (finalTotalCount > 0 && finalCurrentCount >= finalTotalCount) ? 1.0f : ((finalTotalCount > 0) ? (float)finalCurrentCount / finalTotalCount : 0.0f),
+                    (finalTotalCount > 0 && finalCurrentCount >= finalTotalCount) ? "Copy complete." : (finalCurrentCount.ToString($"D{fileCountDigits}") + "/" + finalTotalCount.ToString($"D{fileCountDigits}") + " files copied.")
+                );
+                Progress.Finish(id);
+            }
 #       else
-            //
-            EditorUtility.ClearProgressBar();
+            if (finalTotalCount > 0 && finalCurrentCount >= finalTotalCount)
+            {
+                 EditorUtility.ClearProgressBar(); // Or set to 100% and then clear
+            }
+            else
+            {
+                EditorUtility.DisplayProgressBar(
+                    "Copy Directory: " + targetDirInfo.Name,
+                     finalCurrentCount.ToString($"D{fileCountDigits}") + "/" + finalTotalCount.ToString($"D{fileCountDigits}") + " files copied.",
+                    (finalTotalCount > 0) ? (float)finalCurrentCount / finalTotalCount : 0.0f
+                );
+            }
+            // Ensure progress bar is cleared if it wasn't by reaching 100%
+            // This might be redundant if Progress.Finish or ClearProgressBar is always called on success/failure paths
+            if (!(finalTotalCount > 0 && finalCurrentCount >= finalTotalCount)) {
+                 EditorUtility.ClearProgressBar();
+            }
 #       endif
         }
 

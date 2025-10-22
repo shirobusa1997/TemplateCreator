@@ -15,6 +15,8 @@
 // Standard Namespaces
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 // SharpZipLib Namespaces
 using ICSharpCode.SharpZipLib.Tar;
@@ -93,25 +95,20 @@ namespace MJTStudio.TemplateCreator.Editor
             return true;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="destPath"></param>
-        /// <param name="targetPaths"></param>
-        /// <param name="isRecursive"></param>
-        /// <param name="compressionLevel"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        // public static async Task CompressDirectoriesToTgzAsync(
-        //     string destPath,
-        //     string[] targetPaths,
-        //     bool isRecursive,
-        //     int compressionLevel = 1,
-        //     CancellationToken cancellationToken = default
-        // )
-        // {
-            
-        // }
+        public static async Task<bool> CompressDirectoriesToTgzAsync(
+            string destPath,
+            string[] targetPaths,
+            bool isRecursive,
+            int compressionLevel = 1,
+            CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return CompressDirectoriesToTgz(destPath, targetPaths, isRecursive, compressionLevel);
+            }, cancellationToken);
+        }
 
         /// <summary>
         /// 
